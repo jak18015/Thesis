@@ -1,0 +1,74 @@
+run("Set Measurements...", "area shape stack redirect=None decimal=3");
+wd = "C:/Users/jak-w/OneDrive - University of Connecticut/1-Projects/frm2/results/";
+compartmentPath = wd+".tif/frm2-aid_mapple-rab6_compartments/";
+tablePath = wd+".csv/frm2-aid_mapple-rab6_compartments/";
+roiPath = wd+".zip/frm2-aid_mapple-rab6_compartments/";
+csv_list = getFileList(tablePath);
+print("\\Clear");
+print("Existing CSV's:");
+for (c=0; c<csv_list.length; c++) {
+	print(csv_list[c]);
+}
+full_img = getTitle();
+run("Grays");
+resetMinAndMax;
+run("Duplicate...", "duplicate");
+dup = getTitle();
+run("Z Project...", "projection=[Sum Slices]");
+z_proj = getTitle();
+setTool(2);
+run("Maximize");
+waitForUser("draw around compartment");
+roiManager("add");
+getSelectionCoordinates(xpoints, ypoints);
+type = selectionType();
+close(z_proj);
+selectWindow(dup);
+makeSelection(type, xpoints, ypoints);
+getSelectionBounds(x, y, width, height);
+makeRectangle(x, y, width, height);
+roiManager("add");
+run("Make Inverse");
+run("Clear", "stack");
+makeSelection(type, xpoints, ypoints);
+run("Crop");
+BleachCorrect(dup);
+run("Gaussian Blur...", "sigma=1 stack");
+run("Make Binary", "method=RenyiEntropy background=Dark calculate black");
+image = getTitle();
+shortTitle = File.getNameWithoutExtension(image);
+run("Analyze Particles...", "size=0.01-Infinity pixel circularity=0.01-0.99 display clear add stack");
+selectWindow("Results");
+table = shortTitle+".csv";
+IJ.renameResults(table);
+Table.save(tablePath + table);
+close(table);
+roiSet = shortTitle+".zip";
+roiManager("save", roiPath + roiSet);
+roiManager("deselect");
+roiManager("delete");
+selectWindow(image);
+save(compartmentPath + image);
+selectWindow(full_img);
+
+
+function BleachCorrect(img) {
+	selectWindow(img);
+	Stack.getDimensions(width, height, channels, slices, frames);
+	title = getTitle();
+	makeRectangle(0, 0, width, height);
+	xpoints = newArray();
+	ypoints = newArray();
+	run("Plot Z-axis Profile");
+	Plot.getValues(xpoints, ypoints);
+	Fit.doFit(11, xpoints, ypoints);
+	c = Fit.p(2);
+	close(title+"-0-0");
+	selectWindow(title);
+	run("Bleach Correction", "correction=[Simple Ratio] background="+c);
+	dup = getTitle();
+	close(title);
+	selectWindow(dup);
+	rename(title);
+	run("Select None");
+}
